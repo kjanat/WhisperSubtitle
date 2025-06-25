@@ -1,0 +1,62 @@
+# TODO
+
+Based on the current [README.md](README.md) and the previous error context, here’s what still needs
+to be implemented or fixed to make this project truly bombastic and error-free:
+
+1. **Module Code Linting & Syntax Fixes**
+
+    - The main module file ([WhisperSubtitle.psm1](WhisperSubtitle.psm1)) still has unresolved
+      PowerShell syntax errors (missing braces, reserved parameter issues, etc.).
+      These must be fixed for the module to import and function.
+
+1. **Automated Testing**
+
+    - The Tests folder exists, but there’s no mention of automated test coverage or CI in the [README](README.md).
+    - Implement robust Pester tests for all exported functions and document how to run them.
+
+2. **Installation Automation**
+
+    - The README lists manual, git, and symlink install methods, but no script for dependency setup
+      (e.g., Python, Whisper, FFmpeg, PyTorch).
+    - Provide a PowerShell script to automate environment setup for new users.
+
+3. **Error Handling & Logging**
+
+    - The module claims “Advanced error handling,” but ensure all user-facing functions have clear,
+      user-friendly error messages and verbose logging.
+
+4. **Feature Documentation**
+
+    - The [README](README.md) is solid, but could use a “Feature Matrix” or table showing which
+      features require which dependencies (e.g., GPU, Subtitle Edit).
+
+5. **Examples & Usage**
+
+    - There are no examples in [Basic-Usage.ps1](Examples/Basic-Usage.ps1).
+    - Add more real-world usage examples, including batch processing, translation, and error scenarios.
+
+6. **Contribution & Development Guide**
+
+    - Add a [`CONTRIBUTING.md`](CONTRIBUTING.md) to guide new contributors
+      (coding style, PR process, etc.).
+
+7. **Changelog Automation**
+
+    - The [`CHANGELOG.md`](CHANGELOG.md) exists, but automate changelog updates via commit messages
+      or PRs.
+
+8. **Module Manifest Updates**
+
+    - Ensure [WhisperSubtitle.psd1](WhisperSubtitle.psd1) is always in sync with the latest version and exported functions.
+
+9. **Optional: VS Code Tasks/Launch Config**
+    - Add [`.vscode/tasks.json`](.vscode/tasks.json) and [`.vscode/launch.json`](.vscode/launch.json)
+      for dev workflow automation.
+
+**Summary:**
+
+The core PowerShell logic needs to be fixed and linted, tests and automation should be improved,
+and developer/usage documentation can be expanded. Once the syntax errors are gone and tests pass,
+this module will be unstoppable!
+
+Let me know if you want a prioritized action plan or want to tackle a specific area first!
