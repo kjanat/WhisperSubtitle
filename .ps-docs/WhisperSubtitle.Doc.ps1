@@ -113,11 +113,3 @@ document 'Module' {
 '@
     }
 }
-
-document 'README' {
-    Title 'WhisperSubtitle'
-    
-    # Include existing README content
-    $readmeContent = Get-Content -Path './README.md' -Raw
-    $readmeContent
-}
