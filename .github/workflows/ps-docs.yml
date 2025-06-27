@@ -41,10 +41,9 @@ jobs:
           path: .                 # Working directory for PSDocs
           prerelease: true        # Allow prerelease modules
 
-      - name: Upload docs
-        uses: actions/upload-artifact@v4
+      - name: Upload docs to Pages
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: ps-docs
           path: out
 
   deploy:
