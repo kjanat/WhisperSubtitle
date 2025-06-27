@@ -68,7 +68,8 @@ Set-Location $ModulePath
 - Pipeline support
 - Multiple output formats
 - Batch processing
-- Advanced error handling
+- Improved error handling and logging
+- Enhanced progress reporting
 - Automatic optimization
 
 ## Requirements
@@ -77,6 +78,30 @@ Set-Location $ModulePath
 - FFmpeg
 - Whisper
 - Subtitle Edit (optional)
+
+## Configuration
+
+The module's behavior can be configured using the `Set-WhisperSubtitleConfig` cmdlet. This allows you to customize paths for external tools and temporary files.
+
+### Get Current Configuration
+
+```powershell
+Get-WhisperSubtitleConfig
+```
+
+### Set Configuration
+
+```powershell
+Set-WhisperSubtitleConfig -BaseLocation "D:\WhisperData" -SubtitleEditPath "C:\Program Files\Custom Subtitle Edit\SubtitleEdit.exe"
+```
+
+**Available Parameters for `Set-WhisperSubtitleConfig`:**
+
+- **`BaseLocation`**: Specifies the base directory for Whisper models and temporary files. Defaults to `WhisperFiles` within the module directory.
+- **`TempPath`**: Specifies the directory for temporary audio and subtitle files. Defaults to a `temp` subdirectory within `BaseLocation`.
+- **`SubtitleEditPath`**: Specifies the full path to the `SubtitleEdit.exe` executable. This is optional, and if not set, subtitle optimization will be skipped.
+
+Changes made with `Set-WhisperSubtitleConfig` are persistent across PowerShell sessions.
 
 ## Installation Methods
 

@@ -39,7 +39,9 @@
 	# For best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 	FunctionsToExport    = @(
 		'ConvertTo-Subtitle',
-		'Get-WhisperModuleInfo'
+		'Get-WhisperModuleInfo',
+		'Get-WhisperSubtitleConfig',
+		'Set-WhisperSubtitleConfig'
 	)
 
 	# Cmdlets to export from this module
@@ -62,7 +64,11 @@
 	# List of all files packaged with this module
 	FileList             = @(
 		'WhisperSubtitle.psm1',
-		'WhisperSubtitle.psd1'
+		'WhisperSubtitle.psd1',
+		'Private\Get-ModuleConfig.ps1',
+		'Private\Set-ModuleConfig.ps1',
+		'Public\Get-WhisperSubtitleConfig.ps1',
+		'Public\Set-WhisperSubtitleConfig.ps1'
 	)
 
 	# Private data to pass to the module specified in RootModule/ModuleToProcess.
