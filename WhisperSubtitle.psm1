@@ -9,7 +9,7 @@
 .AUTHOR
     Enhanced WhisperSubtitle Module
 .VERSION
-    0.1.0
+    1.0.0
 #>
 
 using namespace System.IO
@@ -557,6 +557,12 @@ function Get-InputFiles {
 
 	if ([File]::Exists($currentPath)) {
 		$fileInfo = Get-Item -LiteralPath $currentPath
+		
+		# Enhanced file validation
+		if (-not (Test-FileIntegrity -FilePath $fileInfo.FullName)) {
+			throw "File validation failed: $($fileInfo.FullName)"
+		}
+		
 		if ($script:ModuleConfig.SupportedExtensions -contains $fileInfo.Extension.ToLower()) {
 			return @($fileInfo)
 		} else {
@@ -564,7 +570,8 @@ function Get-InputFiles {
 		}
 	} elseif ([Directory]::Exists($currentPath)) {
 		$files = Get-ChildItem -Path $currentPath -File -Recurse |
-			Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() }
+			Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() } |
+			Where-Object { Test-FileIntegrity -FilePath $_.FullName }
 
 		if ($files.Count -eq 0) {
 			throw "No supported video files found in directory: $currentPath"
@@ -575,7 +582,8 @@ function Get-InputFiles {
 		# Handle wildcard patterns
 		try {
 			$files = Get-ChildItem -Path $currentPath -File |
-				Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() }
+				Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() } |
+				Where-Object { Test-FileIntegrity -FilePath $_.FullName }
 
 			if ($files.Count -eq 0) {
 				throw "No matching files found: $currentPath"
@@ -585,6 +593,87 @@ function Get-InputFiles {
 		} catch {
 			throw "Invalid path or pattern: $currentPath"
 		}
+	}
+}
+
+function Test-FileIntegrity {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[string]$FilePath
+	)
+	
+	try {
+		$file = Get-Item -LiteralPath $FilePath -ErrorAction Stop
+		
+		# Check file size (minimum 1KB, maximum 50GB)
+		if ($file.Length -lt 1KB) {
+			Write-ModuleLog -Message "File too small: $($file.Name) ($($file.Length) bytes)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		if ($file.Length -gt 50GB) {
+			Write-ModuleLog -Message "File too large: $($file.Name) ($([math]::Round($file.Length/1GB, 2)) GB)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		# Check file accessibility
+		try {
+			$stream = [System.IO.File]::OpenRead($FilePath)
+			$stream.Close()
+		} catch {
+			Write-ModuleLog -Message "File not accessible: $($file.Name)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		# Basic content validation for video files
+		if ($script:ModuleConfig.SupportedExtensions -contains $file.Extension.ToLower()) {
+			$isValidVideo = Test-VideoFileHeader -FilePath $FilePath
+			if (-not $isValidVideo) {
+				Write-ModuleLog -Message "Invalid video file format: $($file.Name)" -Level Warning -Category 'FileValidation'
+				return $false
+			}
+		}
+		
+		Write-ModuleLog -Message "File validation passed: $($file.Name)" -Level Debug -Category 'FileValidation'
+		return $true
+		
+	} catch {
+		Write-ModuleLog -Message "File validation error: $($_.Exception.Message)" -Level Error -Category 'FileValidation' -Exception $_
+		return $false
+	}
+}
+
+function Test-VideoFileHeader {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[string]$FilePath
+	)
+	
+	try {
+		$bytes = [System.IO.File]::ReadAllBytes($FilePath) | Select-Object -First 16
+		if ($bytes.Count -lt 4) { return $false }
+		
+		# Check common video file signatures
+		$header = [System.BitConverter]::ToString($bytes[0..3]) -replace '-', ''
+		
+		switch -Regex ($header) {
+			'^(66747970|00000018|00000020)' { return $true }  # MP4, M4V, M4A
+			'^52494646' { return $true }                       # AVI, WAV
+			'^1A45DFA3' { return $true }                       # MKV, MKA
+			'^4F676753' { return $true }                       # OGG
+			'^494433|^FFFB|^FFF3' { return $true }            # MP3
+			'^464C4143' { return $true }                       # FLAC
+			default {
+				# Fallback: use ffprobe for validation
+				$ffprobeResult = & ffprobe -v quiet -print_format json -show_format "$FilePath" 2>$null
+				return $LASTEXITCODE -eq 0
+			}
+		}
+	} catch {
+		Write-ModuleLog -Message "Header validation failed for: $([System.IO.Path]::GetFileName($FilePath))" -Level Debug -Category 'FileValidation'
+		return $false
 	}
 }
 
