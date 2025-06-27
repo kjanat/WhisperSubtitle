@@ -1,0 +1,29 @@
+#
+# PSDocs configuration
+# 
+
+# Configure document generation
+document:
+  path: '.'
+
+# Configure markdown output
+output:
+  format: markdown
+  path: 'out/'
+
+# Input configuration
+input:
+  pathIgnore:
+  - '*.Tests.ps1'
+  - 'Build/**'
+  - '.git/**'
+  - '.github/**'
+
+# Execution options
+execution:
+  ruleMatchBehavior: 'All'
+  
+# Convention settings
+convention:
+  include:
+  - 'Document.PowerShell'

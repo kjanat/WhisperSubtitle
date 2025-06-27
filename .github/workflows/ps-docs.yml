@@ -1,100 +1,71 @@
-name: Documentation
+name: Documentation Generation
 
+# Review gh actions docs if you want to further define triggers, paths, etc
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
   workflow_dispatch:
+    inputs:
+      test:
+        description: "Skip deployment to GitHub Pages"
+        type: boolean
+        default: false
+        required: false
 
-# Allow only one concurrent deployment
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ (github.event_name == 'pull_request') && format('test-deploy-{0}', github.event.number) || (github.event_name == 'workflow_dispatch' && inputs.test) && 'test-deploy-manual' || 'deploy' }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Deploy Documentation to GitHub Pages
+  generate:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read # to read the repository contents
+      id-token: write # to verify the deployment originates from an appropriate source
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate docs
+        uses: Microsoft/ps-docs@main
+        with:
+          inputPath: .            # Optional. The path PSDocs will look for files to input files.
+          # modules: string       # Optional. A comma separated list of modules to use containing document definitions.
+          source: .ps-docs/       # Optional. An path containing definitions to use for generating documentation.
+          # conventions: string   # Optional. A comma separated list of conventions to use for generating documentation.
+          outputPath: out         # Optional. The path to write documentation to.
+          path: .                 # Optional. The working directory PSDocs is run from.
+          prerelease: ${{ github.ref == 'refs/heads/master' }} # Optional. Determine if a pre-release module version is installed.
+
+      - name: Upload docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps-docs
+          path: out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: generate
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && !inputs.test)
+
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
-      contents: read
-      pages: write
-      id-token: write
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
 
     # Deploy to the github-pages environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Generate documentation site
-        shell: pwsh
-        run: |
-          Write-Host "Generating documentation site..." -ForegroundColor Green
-          
-          # Create output directory
-          New-Item -Path "./docs-site" -ItemType Directory -Force
-          
-          # Copy main documentation files
-          $docFiles = @(
-            @{Source = "README.md"; Target = "index.md"}
-            @{Source = "Docs/API-Reference.md"; Target = "api-reference.md"}
-            @{Source = "Docs/Configuration.md"; Target = "configuration.md"}
-            @{Source = "TODO.md"; Target = "roadmap.md"}
-            @{Source = "CHANGELOG.md"; Target = "changelog.md"}
-            @{Source = "CONTRIBUTING.md"; Target = "contributing.md"}
-            @{Source = "Examples/Basic-Usage.ps1"; Target = "examples.md"}
-          )
-          
-          foreach ($doc in $docFiles) {
-            if (Test-Path $doc.Source) {
-              if ($doc.Source -eq "Examples/Basic-Usage.ps1") {
-                # Convert PowerShell examples to markdown
-                $content = Get-Content $doc.Source -Raw
-                $mdContent = @"
-          # Examples
-          
-          \`\`\`powershell
-          $content
-          \`\`\`
-          "@
-                Set-Content -Path "./docs-site/$($doc.Target)" -Value $mdContent
-              } else {
-                Copy-Item -Path $doc.Source -Destination "./docs-site/$($doc.Target)" -Force
-              }
-              Write-Host "✓ Added $($doc.Source)" -ForegroundColor Green
-            } else {
-              Write-Host "⚠ Missing $($doc.Source)" -ForegroundColor Yellow
-            }
-          }
-          
-          # Create navigation file
-          $navContent = @"
-          # WhisperSubtitle Documentation
-          
-          - [Home](index.md)
-          - [API Reference](api-reference.md)
-          - [Configuration](configuration.md)
-          - [Examples](examples.md)
-          - [Roadmap](roadmap.md)
-          - [Changelog](changelog.md)
-          - [Contributing](contributing.md)
-          "@
-          Set-Content -Path "./docs-site/_sidebar.md" -Value $navContent
-          
-          Write-Host "✅ Documentation site generated" -ForegroundColor Green
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './docs-site'
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
