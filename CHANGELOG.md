@@ -14,12 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced error handling
 - Progress tracking
 - Comprehensive logging
+- Automated dependency installation script (`Build/Install-Dependencies.ps1`)
+- Comprehensive Pester tests for all functions
+- Detailed usage examples in `Examples/Basic-Usage.ps1`
+- Contribution guidelines in `CONTRIBUTING.md`
 
 ### Changed
 
 - Improved parameter validation
 - Better prerequisite checking
 - Enhanced subtitle optimization
+- Replaced `UseOldWhisper` switch with `WhisperImplementation` parameter for clearer distinction between Whisper versions
+- Updated `README.md` with a Feature Matrix and `API-Reference.md` with detailed parameter documentation
 
 ### Fixed
 

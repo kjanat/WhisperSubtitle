@@ -9,19 +9,38 @@
 .AUTHOR
     Enhanced WhisperSubtitle Module
 .VERSION
-    0.1.0
+    1.0.0
 #>
 
 using namespace System.IO
 using namespace System.Collections.Generic
 
-#region Module Variables
-$script:ModuleConfig = @{
-	BaseLocation          = 'A:\Whisper'
-	TempPath              = $null
-	LogicalProcessorCount = [System.Environment]::ProcessorCount ?? 4
-	SupportedExtensions   = @('.aac', '.avi', '.flac', '.m4a', '.mka', '.mkv', '.mov', '.mp2', '.mp3', '.mp4', '.ogg', '.wav', '.wmv', '.weba', '.webm', '.webma')
-	SubtitleFormats       = @{
+#region Module Configuration
+# Load private configuration functions
+. (Join-Path $PSScriptRoot 'Private\Get-ModuleConfig.ps1')
+. (Join-Path $PSScriptRoot 'Private\Set-ModuleConfig.ps1')
+
+# Load module configuration
+$script:ModuleConfig = Get-ModuleConfig
+
+# Set default values if not present in configuration
+if (-not $script:ModuleConfig.BaseLocation) {
+    $script:ModuleConfig.BaseLocation = Join-Path $PSScriptRoot 'WhisperFiles'
+}
+if (-not $script:ModuleConfig.TempPath) {
+    $script:ModuleConfig.TempPath = Join-Path $script:ModuleConfig.BaseLocation 'temp'
+}
+if (-not $script:ModuleConfig.SubtitleEditPath) {
+    $script:ModuleConfig.SubtitleEditPath = 'C:\Program Files\Subtitle Edit\SubtitleEdit.exe'
+}
+if (-not $script:ModuleConfig.LogicalProcessorCount) {
+    $script:ModuleConfig.LogicalProcessorCount = [System.Environment]::ProcessorCount ?? 4
+}
+if (-not $script:ModuleConfig.SupportedExtensions) {
+    $script:ModuleConfig.SupportedExtensions = @('.aac', '.avi', '.flac', '.m4a', '.mka', '.mkv', '.mov', '.mp2', '.mp3', '.mp4', '.ogg', '.wav', '.wmv', '.weba', '.webm', '.webma')
+}
+if (-not $script:ModuleConfig.SubtitleFormats) {
+    $script:ModuleConfig.SubtitleFormats = @{
 		'txt'  = 'Plaintext'
 		'vtt'  = 'WebVTT'
 		'srt'  = 'SubRip'
@@ -29,14 +48,13 @@ $script:ModuleConfig = @{
 		'lrc'  = 'LRCLyrics'
 	}
 }
-
-# Initialize temp path
-$script:ModuleConfig.TempPath = Join-Path $script:ModuleConfig.BaseLocation 'temp'
 #endregion
 
 #region Helper Functions
+
+#region Helper Functions
 function Write-ModuleLog {
-	[CmdletBinding()]
+	[CmdletBinding(SupportsShouldProcess)]
 	param(
 		[Parameter(Mandatory)]
 		[string]$Message,
@@ -44,14 +62,22 @@ function Write-ModuleLog {
 		[ValidateSet('Info', 'Warning', 'Error', 'Debug', 'Verbose')]
 		[string]$Level = 'Info',
 
-		[string]$Category = 'General'
+		[string]$Category = 'General',
+
+		[System.Exception]$Exception = $null
 	)
 
 	$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 	$logMessage = "[$timestamp] [$Level] [$Category] $Message"
 
 	switch ($Level) {
-		'Error' { Write-Error $logMessage }
+		'Error' {
+			if ($Exception) {
+				Write-Error -Message $logMessage -Exception $Exception
+			} else {
+				Write-Error -Message $logMessage
+			}
+		}
 		'Warning' { Write-Warning $logMessage }
 		'Debug' { Write-Debug $logMessage }
 		'Verbose' { Write-Verbose $logMessage }
@@ -96,7 +122,8 @@ function Test-ModulePrerequisites {
 	}
 
 	if ($errors.Count -gt 0) {
-		throw "Prerequisites check failed:`n$($errors -join "`n")"
+		Write-ModuleLog "Prerequisites check failed." -Level Error -Category 'Prerequisites' -Exception ([System.Exception]::new(($errors -join "`n")))
+		throw "Prerequisites check failed.`n$($errors -join "`n")"
 	}
 
 	Write-ModuleLog 'All prerequisites validated successfully' -Level Info -Category 'Prerequisites'
@@ -127,7 +154,7 @@ function Get-VideoInformation {
 			HasAudio = ($result.streams | Where-Object codec_type -EQ 'audio').Count -gt 0
 		}
 	} catch {
-		Write-ModuleLog "Failed to get video information for: $($File.Name)" -Level Warning -Category 'VideoInfo'
+		Write-ModuleLog "Failed to get video information for: $($File.Name)" -Level Warning -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
 		return @{
 			Duration = [TimeSpan]::Zero
 			Size     = $File.Length
@@ -147,7 +174,7 @@ function New-AudioFromVideo {
 		[string]$OutputPath
 	)
 
-	Write-ModuleLog "Converting video to audio: $($VideoFile.Name)" -Level Info -Category 'AudioConversion'
+	Write-ModuleLog "Converting video to audio: $($VideoFile.Name)" -Level Info -Category $PSCmdlet.MyInvocation.InvocationName
 
 	$ffmpegArgs = @(
 		'-hwaccel', 'auto'
@@ -172,9 +199,9 @@ function New-AudioFromVideo {
 			throw "Audio file was not created: $OutputPath"
 		}
 
-		Write-ModuleLog 'Audio conversion completed successfully' -Level Verbose -Category 'AudioConversion'
+		Write-ModuleLog 'Audio conversion completed successfully' -Level Verbose -Category $PSCmdlet.MyInvocation.InvocationName
 	} catch {
-		Write-ModuleLog "Audio conversion failed: $($_.Exception.Message)" -Level Error -Category 'AudioConversion'
+		Write-ModuleLog "Audio conversion failed: $($_.Exception.Message)" -Level Error -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
 		throw
 	}
 }
@@ -200,19 +227,20 @@ function Invoke-WhisperTranscription {
 		[Parameter(Mandatory)]
 		[int]$Processors,
 
-		[switch]$UseOldWhisper,
+		[Parameter(Mandatory)]
+		[string]$WhisperImplementation,
 
 		[switch]$Translate
 	)
 
-	Write-ModuleLog 'Starting Whisper transcription' -Level Info -Category 'Transcription'
+	Write-ModuleLog 'Starting Whisper transcription' -Level Info -Category $PSCmdlet.MyInvocation.InvocationName
 
 	$isVerbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue'
 
-	if ($UseOldWhisper) {
-		Invoke-LegacyWhisper @PSBoundParameters -Verbose:$isVerbose
+			if ($WhisperImplementation -eq 'Legacy') {
+		Invoke-LegacyWhisper -AudioPath $AudioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation $WhisperImplementation -Translate:$Translate -Verbose:$isVerbose
 	} else {
-		Invoke-ModernWhisper @PSBoundParameters -Verbose:$isVerbose
+		Invoke-ModernWhisper -AudioPath $AudioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation $WhisperImplementation -Translate:$Translate -Verbose:$isVerbose
 	}
 }
 
@@ -230,6 +258,7 @@ function Invoke-LegacyWhisper {
 	$executablePath = Join-Path $script:ModuleConfig.BaseLocation 'main.exe'
 	$modelPath = Join-Path $script:ModuleConfig.BaseLocation 'models\large.bin'
 	if (-not (Test-Path $executablePath)) {
+		Write-ModuleLog "Legacy Whisper executable not found: $executablePath" -Level Error -Category $PSCmdlet.MyInvocation.InvocationName -Exception ([System.IO.FileNotFoundException]::new("Legacy Whisper executable not found: $executablePath"))
 		throw "Legacy Whisper executable not found: $executablePath"
 	}
 	$arguments = @(
@@ -241,10 +270,16 @@ function Invoke-LegacyWhisper {
 		'--file', $AudioPath
 	)
 	if ($Translate) { $arguments += '--translate' }
-	Write-ModuleLog "Executing legacy Whisper: $executablePath" -Level Debug -Category 'Transcription'
-	$process = Start-Process -FilePath $executablePath -ArgumentList $arguments -NoNewWindow -PassThru -Wait
-	if ($process.ExitCode -ne 0) {
-		throw "Legacy Whisper failed with exit code: $($process.ExitCode)"
+	Write-ModuleLog "Executing legacy Whisper: $executablePath" -Level Debug -Category $PSCmdlet.MyInvocation.InvocationName
+	try {
+		$process = Start-Process -FilePath $executablePath -ArgumentList $arguments -NoNewWindow -PassThru -Wait
+
+		if ($process.ExitCode -ne 0) {
+			throw "Legacy Whisper failed with exit code: $($process.ExitCode)"
+		}
+	} catch {
+		Write-ModuleLog "Legacy Whisper execution failed: $($_.Exception.Message)" -Level Error -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
+		throw
 	}
 }
 
@@ -257,6 +292,7 @@ function Invoke-ModernWhisper {
 		[string]$Format,
 		[int]$Threads,
 		[int]$Processors,
+		[string]$WhisperImplementation,
 		[switch]$Translate
 	)
 	$arguments = @(
@@ -271,10 +307,16 @@ function Invoke-ModernWhisper {
 	if ($Language -ne 'auto') {
 		$arguments += '--language', $Language
 	}
-	Write-ModuleLog 'Executing modern Whisper' -Level Debug -Category 'Transcription'
-	$process = Start-Process -FilePath 'whisper' -ArgumentList $arguments -NoNewWindow -PassThru -Wait
-	if ($process.ExitCode -ne 0) {
-		throw "Modern Whisper failed with exit code: $($process.ExitCode)"
+	Write-ModuleLog 'Executing modern Whisper' -Level Debug -Category $PSCmdlet.MyInvocation.InvocationName
+	try {
+		$process = Start-Process -FilePath 'whisper' -ArgumentList $arguments -NoNewWindow -PassThru -Wait
+
+		if ($process.ExitCode -ne 0) {
+			throw "Modern Whisper failed with exit code: $($process.ExitCode)"
+		}
+	} catch {
+		Write-ModuleLog "Modern Whisper execution failed: $($_.Exception.Message)" -Level Error -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
+		throw
 	}
 }
 
@@ -288,14 +330,14 @@ function Optimize-SubtitleFile {
 		[string]$Format
 	)
 
-	$subtitleEditPath = 'C:\Program Files\Subtitle Edit\SubtitleEdit.exe'
+	$subtitleEditPath = $script:ModuleConfig.SubtitleEditPath
 
 	if (-not (Test-Path $subtitleEditPath)) {
-		Write-ModuleLog 'Subtitle Edit not found, skipping optimization' -Level Warning -Category 'Optimization'
+		Write-ModuleLog 'Subtitle Edit not found, skipping optimization' -Level Warning -Category $PSCmdlet.MyInvocation.InvocationName
 		return
 	}
 
-	Write-ModuleLog "Optimizing subtitle file: $(Split-Path $SubtitlePath -Leaf)" -Level Info -Category 'Optimization'
+	Write-ModuleLog "Optimizing subtitle file: $(Split-Path $SubtitlePath -Leaf)" -Level Info -Category $PSCmdlet.MyInvocation.InvocationName
 
 	$formatMapping = $script:ModuleConfig.SubtitleFormats[$Format]
 
@@ -314,12 +356,12 @@ function Optimize-SubtitleFile {
 		$process = Start-Process -FilePath $subtitleEditPath -ArgumentList $arguments -NoNewWindow -PassThru -Wait -RedirectStandardOutput 'NUL'
 
 		if ($process.ExitCode -eq 0) {
-			Write-ModuleLog 'Subtitle optimization completed' -Level Verbose -Category 'Optimization'
+			Write-ModuleLog 'Subtitle optimization completed' -Level Verbose -Category $PSCmdlet.MyInvocation.InvocationName
 		} else {
-			Write-ModuleLog "Subtitle optimization failed with exit code: $($process.ExitCode)" -Level Warning -Category 'Optimization'
+			Write-ModuleLog "Subtitle optimization failed with exit code: $($process.ExitCode)" -Level Warning -Category $PSCmdlet.MyInvocation.InvocationName
 		}
 	} catch {
-		Write-ModuleLog "Subtitle optimization error: $($_.Exception.Message)" -Level Warning -Category 'Optimization'
+		Write-ModuleLog "Subtitle optimization error: $($_.Exception.Message)" -Level Warning -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
 	}
 }
 
@@ -375,8 +417,8 @@ function ConvertTo-Subtitle {
     .PARAMETER Format
         The output subtitle format (default: 'srt')
 
-    .PARAMETER UseOldWhisper
-        Use the legacy Whisper implementation
+    .PARAMETER WhisperImplementation
+        Specify which Whisper implementation to use: 'Modern' (default) or 'Legacy'
 
     .PARAMETER Translate
         Translate the subtitles to English
@@ -421,7 +463,8 @@ function ConvertTo-Subtitle {
 		[string]$Format = 'srt',
 
 		[Parameter()]
-		[switch]$UseOldWhisper,
+		[ValidateSet('Modern', 'Legacy')]
+		[string]$WhisperImplementation = 'Modern',
 
 		[Parameter()]
 		[switch]$Translate,
@@ -434,13 +477,14 @@ function ConvertTo-Subtitle {
 		[switch]$PassThru
 	)
 
-	begin {
+							begin {
 		Write-ModuleLog 'Starting subtitle conversion process' -Level Info
 
 		try {
 			Test-ModulePrerequisites
 		} catch {
-			throw "Prerequisites validation failed: $($_.Exception.Message)"
+			Write-ModuleLog "Prerequisites validation failed: $($_.Exception.Message)" -Level Error -Category $PSCmdlet.MyInvocation.InvocationName -Exception $_.Exception
+			throw
 		}
 
 		$cpuSettings = Get-WhisperOptimalCpuSettings
@@ -455,11 +499,16 @@ function ConvertTo-Subtitle {
 		Write-ModuleLog "Process started at: $startTime" -Level Verbose
 	}
 
-	process {
+		process {
 		try {
 			$files = Get-InputFiles -InputPath $InputPath
+			$fileCount = $files.Count
+			$currentFileIndex = 0
 
 			foreach ($file in $files) {
+				$currentFileIndex++
+				Write-Progress -Activity "Generating Subtitles" -Status "Processing $($file.Name)" -CurrentOperation "File $currentFileIndex of $fileCount" -PercentComplete (($currentFileIndex / $fileCount) * 100)
+
 				if ($PSCmdlet.ShouldProcess($file.FullName, 'Generate subtitles')) {
 					$result = ConvertSingleFile -File $file -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -UseOldWhisper:$UseOldWhisper -Translate:$Translate
 					$processedFiles.Add($result)
@@ -475,16 +524,16 @@ function ConvertTo-Subtitle {
 		}
 	}
 
-	end {
+		end {
 		$elapsedTime = (Get-Date) - $startTime
-		$Host.UI.RawUI.WindowTitle = $originalWindowTitle
+		
 
 		Write-ModuleLog 'Subtitle conversion completed' -Level Info
 		Write-ModuleLog "Total files processed: $($processedFiles.Count)" -Level Info
 		Write-ModuleLog "Total time elapsed: $($elapsedTime.ToString('hh\:mm\:ss'))" -Level Info
 
 		if (-not $PassThru) {
-			return $processedFiles
+			Write-Output $processedFiles
 		}
 	}
 }
@@ -508,6 +557,12 @@ function Get-InputFiles {
 
 	if ([File]::Exists($currentPath)) {
 		$fileInfo = Get-Item -LiteralPath $currentPath
+		
+		# Enhanced file validation
+		if (-not (Test-FileIntegrity -FilePath $fileInfo.FullName)) {
+			throw "File validation failed: $($fileInfo.FullName)"
+		}
+		
 		if ($script:ModuleConfig.SupportedExtensions -contains $fileInfo.Extension.ToLower()) {
 			return @($fileInfo)
 		} else {
@@ -515,7 +570,8 @@ function Get-InputFiles {
 		}
 	} elseif ([Directory]::Exists($currentPath)) {
 		$files = Get-ChildItem -Path $currentPath -File -Recurse |
-			Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() }
+			Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() } |
+			Where-Object { Test-FileIntegrity -FilePath $_.FullName }
 
 		if ($files.Count -eq 0) {
 			throw "No supported video files found in directory: $currentPath"
@@ -526,7 +582,8 @@ function Get-InputFiles {
 		# Handle wildcard patterns
 		try {
 			$files = Get-ChildItem -Path $currentPath -File |
-				Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() }
+				Where-Object { $script:ModuleConfig.SupportedExtensions -contains $_.Extension.ToLower() } |
+				Where-Object { Test-FileIntegrity -FilePath $_.FullName }
 
 			if ($files.Count -eq 0) {
 				throw "No matching files found: $currentPath"
@@ -536,6 +593,87 @@ function Get-InputFiles {
 		} catch {
 			throw "Invalid path or pattern: $currentPath"
 		}
+	}
+}
+
+function Test-FileIntegrity {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[string]$FilePath
+	)
+	
+	try {
+		$file = Get-Item -LiteralPath $FilePath -ErrorAction Stop
+		
+		# Check file size (minimum 1KB, maximum 50GB)
+		if ($file.Length -lt 1KB) {
+			Write-ModuleLog -Message "File too small: $($file.Name) ($($file.Length) bytes)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		if ($file.Length -gt 50GB) {
+			Write-ModuleLog -Message "File too large: $($file.Name) ($([math]::Round($file.Length/1GB, 2)) GB)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		# Check file accessibility
+		try {
+			$stream = [System.IO.File]::OpenRead($FilePath)
+			$stream.Close()
+		} catch {
+			Write-ModuleLog -Message "File not accessible: $($file.Name)" -Level Warning -Category 'FileValidation'
+			return $false
+		}
+		
+		# Basic content validation for video files
+		if ($script:ModuleConfig.SupportedExtensions -contains $file.Extension.ToLower()) {
+			$isValidVideo = Test-VideoFileHeader -FilePath $FilePath
+			if (-not $isValidVideo) {
+				Write-ModuleLog -Message "Invalid video file format: $($file.Name)" -Level Warning -Category 'FileValidation'
+				return $false
+			}
+		}
+		
+		Write-ModuleLog -Message "File validation passed: $($file.Name)" -Level Debug -Category 'FileValidation'
+		return $true
+		
+	} catch {
+		Write-ModuleLog -Message "File validation error: $($_.Exception.Message)" -Level Error -Category 'FileValidation' -Exception $_
+		return $false
+	}
+}
+
+function Test-VideoFileHeader {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory)]
+		[string]$FilePath
+	)
+	
+	try {
+		$bytes = [System.IO.File]::ReadAllBytes($FilePath) | Select-Object -First 16
+		if ($bytes.Count -lt 4) { return $false }
+		
+		# Check common video file signatures
+		$header = [System.BitConverter]::ToString($bytes[0..3]) -replace '-', ''
+		
+		switch -Regex ($header) {
+			'^(66747970|00000018|00000020)' { return $true }  # MP4, M4V, M4A
+			'^52494646' { return $true }                       # AVI, WAV
+			'^1A45DFA3' { return $true }                       # MKV, MKA
+			'^4F676753' { return $true }                       # OGG
+			'^494433|^FFFB|^FFF3' { return $true }            # MP3
+			'^464C4143' { return $true }                       # FLAC
+			default {
+				# Fallback: use ffprobe for validation
+				$ffprobeResult = & ffprobe -v quiet -print_format json -show_format "$FilePath" 2>$null
+				return $LASTEXITCODE -eq 0
+			}
+		}
+	} catch {
+		Write-ModuleLog -Message "Header validation failed for: $([System.IO.Path]::GetFileName($FilePath))" -Level Debug -Category 'FileValidation'
+		return $false
 	}
 }
 
@@ -550,30 +688,19 @@ function ConvertSingleFile {
 		[string]$Format,
 		[int]$Threads,
 		[int]$Processors,
-		[switch]$UseOldWhisper,
+		[string]$WhisperImplementation,
 		[switch]$Translate
 	)
 	$fileHash = (Get-FileHash -LiteralPath $File.FullName -Algorithm MD5).Hash
 	$audioPath = Join-Path $script:ModuleConfig.TempPath "$fileHash.wav"
 	$subtitlePath = Join-Path $script:ModuleConfig.TempPath "$fileHash.$Format"
 	try {
-		# Update window title with progress
 		$videoInfo = Get-VideoInformation -File $File
-		$durationFormatArray = @('hh\:mm\:ss', 'mm\:ss', 'ss')
-		if ($videoInfo.Duration.TotalHours -ge 1) {
-			$durationFormatIndex = 0
-		} elseif ($videoInfo.Duration.TotalMinutes -ge 1) {
-			$durationFormatIndex = 1
-		} else {
-			$durationFormatIndex = 2
-		}
-		$durationDisplay = $videoInfo.Duration.ToString($durationFormatArray[$durationFormatIndex])
-		$Host.UI.RawUI.WindowTitle = "Subtitle Generation | $durationDisplay | $($File.Name)"
 		Write-ModuleLog "Processing: $($File.Name)" -Level Info -Category 'FileProcessing'
 		# Step 1: Extract audio
 		New-AudioFromVideo -VideoFile $File -OutputPath $audioPath
 		# Step 2: Generate subtitles
-		Invoke-WhisperTranscription -AudioPath $audioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -UseOldWhisper:$UseOldWhisper -Translate:$Translate
+		Invoke-WhisperTranscription -AudioPath $audioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation:$WhisperImplementation -Translate:$Translate
 		# Step 3: Move and optimize subtitle
 		$languageSuffix = $Translate ? 'en' : $Language
 		$finalSubtitlePath = Join-Path $File.Directory "$($File.BaseName).$languageSuffix.$Format"
@@ -639,7 +766,7 @@ function Get-WhisperModuleInfo {
 		Prerequisites       = @{
 			FFmpeg       = ($null -ne (Get-Command ffmpeg -ErrorAction SilentlyContinue))
 			Whisper      = ($null -ne (Get-Command whisper -ErrorAction SilentlyContinue))
-			SubtitleEdit = Test-Path 'C:\Program Files\Subtitle Edit\SubtitleEdit.exe'
+			SubtitleEdit = Test-Path $script:ModuleConfig.SubtitleEditPath
 		}
 	}
 }
@@ -649,6 +776,8 @@ function Get-WhisperModuleInfo {
 Export-ModuleMember -Function @(
 	'ConvertTo-Subtitle'
 	'Get-WhisperModuleInfo'
+	'Get-WhisperSubtitleConfig'
+	'Set-WhisperSubtitleConfig'
 )
 
 # Create aliases for backward compatibility

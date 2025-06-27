@@ -68,7 +68,8 @@ Set-Location $ModulePath
 - Pipeline support
 - Multiple output formats
 - Batch processing
-- Advanced error handling
+- Improved error handling and logging
+- Enhanced progress reporting
 - Automatic optimization
 
 ## Requirements
@@ -77,6 +78,57 @@ Set-Location $ModulePath
 - FFmpeg
 - Whisper
 - Subtitle Edit (optional)
+
+## Feature Matrix
+
+| Feature / Dependency | FFmpeg | Whisper (Modern) | Whisper (Legacy) | Subtitle Edit | Python | PyTorch | CUDA (GPU) |
+| :------------------- | :----: | :--------------: | :--------------: | :-----------: | :----: | :-----: | :--------: |
+| **Video to Audio Extraction** | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| **Transcription (Modern)** | ➖ | ✅ | ➖ | ➖ | ✅ | ✅ | ⚡ |
+| **Transcription (Legacy)** | ➖ | ➖ | ✅ | ➖ | ➖ | ➖ | ➖ |
+| **Subtitle Optimization** | ➖ | ➖ | ➖ | ✅ | ➖ | ➖ | ➖ |
+| **Batch Processing** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚡ |
+| **Translation** | ➖ | ✅ | ✅ | ➖ | ✅ | ✅ | ⚡ |
+
+**Legend:**
+- ✅: Required
+- ⚡: Optional, for GPU acceleration
+- ➖: Not directly required by this feature, but may be a prerequisite for other features or the Whisper implementation itself.
+
+## Configuration
+
+The module's behavior can be configured using the `Set-WhisperSubtitleConfig` cmdlet. This allows you to customize paths for external tools and temporary files.
+
+### Get Current Configuration
+
+```powershell
+Get-WhisperSubtitleConfig
+```
+
+### Set Configuration
+
+```powershell
+Set-WhisperSubtitleConfig -BaseLocation "D:\WhisperData" -SubtitleEditPath "C:\Program Files\Custom Subtitle Edit\SubtitleEdit.exe"
+```
+
+**Available Parameters for `Set-WhisperSubtitleConfig`:**
+
+- **`BaseLocation`**: Specifies the base directory for Whisper models and temporary files. Defaults to `WhisperFiles` within the module directory.
+- **`TempPath`**: Specifies the directory for temporary audio and subtitle files. Defaults to a `temp` subdirectory within `BaseLocation`.
+- **`SubtitleEditPath`**: Specifies the full path to the `SubtitleEdit.exe` executable. This is optional, and if not set, subtitle optimization will be skipped.
+
+Changes made with `Set-WhisperSubtitleConfig` are persistent across PowerShell sessions.
+
+## `ConvertTo-Subtitle` Parameters
+
+- **`InputPath`**: The video file(s) or directory containing video files to process.
+- **`Language`**: The language of the subtitle content (default: `'nl'`).
+- **`Model`**: The Whisper model to use for transcription (default: `'turbo'`).
+- **`Format`**: The output subtitle format (default: `'srt'`).
+
+- **`Translate`**: Translate the subtitles to English.
+- **`Threads`**: Number of processing threads to use.
+- **`PassThru`**: Return processed file information.
 
 ## Installation Methods
 

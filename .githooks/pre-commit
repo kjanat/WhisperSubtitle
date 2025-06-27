@@ -1,0 +1,66 @@
+#!/bin/sh
+# Pre-commit hook to ensure version consistency and code quality
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "${GREEN}Running pre-commit checks...${NC}"
+
+# Check if PowerShell is available
+if ! command -v pwsh >/dev/null 2>&1; then
+    echo "${RED}Error: PowerShell Core (pwsh) is required but not installed.${NC}"
+    exit 1
+fi
+
+# Function to extract version from .psm1 file
+get_psm1_version() {
+    grep -A1 "\.VERSION" WhisperSubtitle.psm1 | grep -E "[0-9]+\.[0-9]+\.[0-9]+" | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/'
+}
+
+# Function to extract version from .psd1 file
+get_psd1_version() {
+    grep -E "^\s*ModuleVersion\s*=" WhisperSubtitle.psd1 | sed -E "s/.*ModuleVersion[[:space:]]*=[[:space:]]*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/"
+}
+
+# Check version consistency
+echo "Checking version consistency..."
+PSM1_VERSION=$(get_psm1_version)
+PSD1_VERSION=$(get_psd1_version)
+
+if [ "$PSM1_VERSION" != "$PSD1_VERSION" ]; then
+    echo "${RED}Error: Version mismatch detected!${NC}"
+    echo "  WhisperSubtitle.psm1: ${PSM1_VERSION}"
+    echo "  WhisperSubtitle.psd1: ${PSD1_VERSION}"
+    echo "${YELLOW}Please ensure both files have the same version number.${NC}"
+    exit 1
+fi
+
+echo "${GREEN}✓ Version consistency check passed (v${PSM1_VERSION})${NC}"
+
+# Run PowerShell script analyzer if available
+if pwsh -Command "try { Get-Module -ListAvailable PSScriptAnalyzer -ErrorAction Stop | Out-Null; exit 0 } catch { exit 1 }" >/dev/null 2>&1; then
+    echo "Running PSScriptAnalyzer..."
+    if ! pwsh -Command "try { \$errors = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost | Where-Object Severity -eq 'Error'; if (\$errors.Count -gt 0) { \$errors | ForEach-Object { Write-Host \$_.Message -ForegroundColor Red }; exit 1 } else { exit 0 } } catch { exit 1 }"; then
+        echo "${RED}PSScriptAnalyzer found errors. Please fix them before committing.${NC}"
+        exit 1
+    fi
+    echo "${GREEN}✓ PSScriptAnalyzer check passed${NC}"
+else
+    echo "${YELLOW}Warning: PSScriptAnalyzer not available, skipping code analysis${NC}"
+fi
+
+# Check if tests exist and can be discovered
+if [ -d "Tests" ]; then
+    echo "Checking test files..."
+    if ! pwsh -Command "if (Get-ChildItem -Path Tests -Filter '*.Tests.ps1' -Recurse) { exit 0 } else { exit 1 }"; then
+        echo "${YELLOW}Warning: No test files found in Tests directory${NC}"
+    else
+        echo "${GREEN}✓ Test files found${NC}"
+    fi
+fi
+
+echo "${GREEN}All pre-commit checks passed!${NC}"
+exit 0

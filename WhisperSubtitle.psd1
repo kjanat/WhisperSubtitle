@@ -9,7 +9,7 @@
 @{
 	# Module metadata
 	RootModule           = 'WhisperSubtitle.psm1'
-	ModuleVersion        = '0.1.0'
+	ModuleVersion        = '1.0.0'
 	GUID                 = '8d8bd1ba-3422-5ec4-aecc-f19af28d2cf1'
 
 	# Author and company information
@@ -21,7 +21,7 @@
 	Description          = 'Professional subtitle generation module using OpenAI Whisper with advanced features for video processing, multiple output formats, and batch operations.'
 
 	# Minimum PowerShell version
-	PowerShellVersion    = '7'
+	PowerShellVersion    = '7.0'
 
 	# Required modules and assemblies
 	RequiredModules      = @()
@@ -39,7 +39,9 @@
 	# For best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 	FunctionsToExport    = @(
 		'ConvertTo-Subtitle',
-		'Get-WhisperModuleInfo'
+		'Get-WhisperModuleInfo',
+		'Get-WhisperSubtitleConfig',
+		'Set-WhisperSubtitleConfig'
 	)
 
 	# Cmdlets to export from this module
@@ -62,7 +64,11 @@
 	# List of all files packaged with this module
 	FileList             = @(
 		'WhisperSubtitle.psm1',
-		'WhisperSubtitle.psd1'
+		'WhisperSubtitle.psd1',
+		'Private\Get-ModuleConfig.ps1',
+		'Private\Set-ModuleConfig.ps1',
+		'Public\Get-WhisperSubtitleConfig.ps1',
+		'Public\Set-WhisperSubtitleConfig.ps1'
 	)
 
 	# Private data to pass to the module specified in RootModule/ModuleToProcess.
