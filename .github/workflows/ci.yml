@@ -1,0 +1,199 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            shell: pwsh
+          - os: windows-latest
+            shell: pwsh
+          - os: macos-latest
+            shell: pwsh
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup PowerShell
+      shell: ${{ matrix.shell }}
+      run: |
+        Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+        Write-Host "OS: $($PSVersionTable.OS)"
+    
+    - name: Install dependencies
+      shell: ${{ matrix.shell }}
+      run: |
+        Write-Host "Installing PSScriptAnalyzer..."
+        Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+        
+        Write-Host "Installing Pester..."
+        Install-Module -Name Pester -Force -Scope CurrentUser -Repository PSGallery -MinimumVersion 5.0.0
+        
+        # Install build dependencies if script exists
+        if (Test-Path "./Build/Install-Dependencies.ps1") {
+          Write-Host "Running dependency installation script..."
+          & "./Build/Install-Dependencies.ps1"
+        }
+    
+    - name: Run PSScriptAnalyzer
+      shell: ${{ matrix.shell }}
+      run: |
+        Write-Host "Running PSScriptAnalyzer..."
+        $analysisResults = Invoke-ScriptAnalyzer -Path . -Recurse -ExcludeRule PSAvoidUsingWriteHost
+        
+        $errors = $analysisResults | Where-Object Severity -eq 'Error'
+        $warnings = $analysisResults | Where-Object Severity -eq 'Warning'
+        
+        Write-Host "Analysis Results:"
+        Write-Host "  Errors: $($errors.Count)"
+        Write-Host "  Warnings: $($warnings.Count)"
+        
+        if ($errors.Count -gt 0) {
+          Write-Host "Errors found:" -ForegroundColor Red
+          $errors | ForEach-Object { 
+            Write-Host "  $($_.RuleName): $($_.Message) at $($_.ScriptName):$($_.Line)" -ForegroundColor Red 
+          }
+          exit 1
+        }
+        
+        if ($warnings.Count -gt 0) {
+          Write-Host "Warnings found:" -ForegroundColor Yellow
+          $warnings | ForEach-Object { 
+            Write-Host "  $($_.RuleName): $($_.Message) at $($_.ScriptName):$($_.Line)" -ForegroundColor Yellow 
+          }
+        }
+    
+    - name: Test module manifest
+      shell: ${{ matrix.shell }}
+      run: |
+        Write-Host "Testing module manifest..."
+        $manifest = Test-ModuleManifest -Path "./WhisperSubtitle.psd1" -ErrorAction Stop
+        Write-Host "✓ Manifest is valid"
+        Write-Host "  Module: $($manifest.Name)"
+        Write-Host "  Version: $($manifest.Version)"
+        Write-Host "  Author: $($manifest.Author)"
+    
+    - name: Run Pester tests
+      shell: ${{ matrix.shell }}
+      run: |
+        Write-Host "Running Pester tests with coverage..."
+        
+        # Import Pester
+        Import-Module Pester -Force
+        
+        # Configure Pester
+        $config = New-PesterConfiguration
+        $config.Run.Path = "./Tests"
+        $config.TestResult.Enabled = $true
+        $config.TestResult.OutputFormat = "NUnitXml"
+        $config.TestResult.OutputPath = "./TestResults.xml"
+        $config.CodeCoverage.Enabled = $true
+        $config.CodeCoverage.Path = "./WhisperSubtitle.psm1"
+        $config.CodeCoverage.OutputFormat = "JaCoCo"
+        $config.CodeCoverage.OutputPath = "./coverage.xml"
+        $config.Output.Verbosity = "Detailed"
+        
+        # Run tests
+        $result = Invoke-Pester -Configuration $config
+        
+        Write-Host "Test Results:"
+        Write-Host "  Total: $($result.TotalCount)"
+        Write-Host "  Passed: $($result.PassedCount)"
+        Write-Host "  Failed: $($result.FailedCount)"
+        Write-Host "  Skipped: $($result.SkippedCount)"
+        
+        if ($result.CodeCoverage) {
+          $coverage = [math]::Round(($result.CodeCoverage.NumberOfCommandsExecuted / $result.CodeCoverage.NumberOfCommandsAnalyzed) * 100, 2)
+          Write-Host "  Code Coverage: $coverage%"
+        }
+        
+        if ($result.FailedCount -gt 0) {
+          Write-Host "Tests failed!" -ForegroundColor Red
+          exit 1
+        }
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}
+        path: |
+          TestResults.xml
+          coverage.xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: matrix.os == 'ubuntu-latest'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  build:
+    name: Build and validate
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run build script
+      shell: pwsh
+      run: |
+        Write-Host "Running build validation..."
+        & "./Build/Build.ps1" -Validate
+        
+        Write-Host "Testing version consistency..."
+        & "./Build/Build.ps1" -SyncVersions
+    
+    - name: Package module
+      shell: pwsh
+      run: |
+        Write-Host "Creating module package..."
+        $moduleName = "WhisperSubtitle"
+        $packagePath = "./dist"
+        
+        # Create package directory
+        New-Item -Path $packagePath -ItemType Directory -Force
+        
+        # Copy module files
+        $moduleFiles = @(
+          "WhisperSubtitle.psd1",
+          "WhisperSubtitle.psm1",
+          "LICENSE",
+          "README.md",
+          "CHANGELOG.md",
+          "Private",
+          "Public",
+          "Build",
+          "Tests",
+          "Docs",
+          "Examples"
+        )
+        
+        foreach ($file in $moduleFiles) {
+          if (Test-Path $file) {
+            Copy-Item -Path $file -Destination "$packagePath/" -Recurse -Force
+            Write-Host "✓ Copied $file"
+          }
+        }
+        
+        Write-Host "✓ Module packaged successfully"
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: module-package
+        path: ./dist/
