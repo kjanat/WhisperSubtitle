@@ -75,10 +75,10 @@
 
 			# License and project URLs
 			# A URL to the license for this module.
-			LicenseUri                 = ''
+			LicenseUri                 = 'https://github.com/kjanat/WhisperSubtitle/blob/master/LICENSE'
 			# A URL to the main website for this project.
-			ProjectUri                 = ''
-			IconUri                    = ''
+			ProjectUri                 = 'https://github.com/kjanat/WhisperSubtitle'
+			IconUri                    = 'https://github.com/kjanat/WhisperSubtitle/raw/master/Assets/icon.svg'
 
 			# Release notes
 			ReleaseNotes               = @'
