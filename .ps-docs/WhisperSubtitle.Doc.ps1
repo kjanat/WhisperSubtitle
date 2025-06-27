@@ -46,40 +46,41 @@ document 'Module' {
             foreach ($function in $functions) {
                 $help = Get-Help $function.Name -Full -ErrorAction SilentlyContinue
             
-            Section $function.Name {
-                $help.Synopsis
-                
-                if ($help.Description) {
-                    Section 'Description' {
-                        $help.Description.Text
+                Section $function.Name {
+                    $help.Synopsis
+                    
+                    if ($help.Description) {
+                        Section 'Description' {
+                            $help.Description.Text
+                        }
                     }
-                }
-                
-                if ($help.Parameters.Parameter) {
-                    Section 'Parameters' {
-                        foreach ($param in $help.Parameters.Parameter) {
-                            Section $param.Name {
-                                Paragraph {
-                                    "Type: $($param.Type.Name)"
-                                    if ($param.Required -eq 'true') { 'Required: Yes' } else { 'Required: No' }
-                                    if ($param.DefaultValue) { "Default: $($param.DefaultValue)" }
-                                }
-                                
-                                if ($param.Description.Text) {
-                                    $param.Description.Text
+                    
+                    if ($help.Parameters.Parameter) {
+                        Section 'Parameters' {
+                            foreach ($param in $help.Parameters.Parameter) {
+                                Section $param.Name {
+                                    Paragraph {
+                                        "Type: $($param.Type.Name)"
+                                        if ($param.Required -eq 'true') { 'Required: Yes' } else { 'Required: No' }
+                                        if ($param.DefaultValue) { "Default: $($param.DefaultValue)" }
+                                    }
+                                    
+                                    if ($param.Description.Text) {
+                                        $param.Description.Text
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                
-                if ($help.Examples.Example) {
-                    Section 'Examples' {
-                        foreach ($example in $help.Examples.Example) {
-                            if ($example.Code) {
-                                Code powershell $example.Code
-                                if ($example.Remarks.Text) {
-                                    $example.Remarks.Text
+                    
+                    if ($help.Examples.Example) {
+                        Section 'Examples' {
+                            foreach ($example in $help.Examples.Example) {
+                                if ($example.Code) {
+                                    Code powershell $example.Code
+                                    if ($example.Remarks.Text) {
+                                        $example.Remarks.Text
+                                    }
                                 }
                             }
                         }
