@@ -9,7 +9,7 @@
 @{
 	# Module metadata
 	RootModule           = 'WhisperSubtitle.psm1'
-	ModuleVersion        = '0.1.0'
+	ModuleVersion        = '1.0.0'
 	GUID                 = '8d8bd1ba-3422-5ec4-aecc-f19af28d2cf1'
 
 	# Author and company information

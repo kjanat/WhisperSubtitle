@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "PowerShell: Launch Current File",
+            "script": "${file}",
+            "cwd": "${file}"
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "PowerShell: Debug Module",
+            "script": "${workspaceFolder}/Examples/Basic-Usage.ps1",
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

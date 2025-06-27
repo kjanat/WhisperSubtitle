@@ -3,55 +3,48 @@
 Based on the current [README.md](README.md) and the previous error context, here’s what still needs
 to be implemented or fixed to make this project truly bombastic and error-free:
 
-1. **Module Code Linting & Syntax Fixes**
+1. **Module Code Linting & Syntax Fixes** (Completed)
 
-    - The main module file ([WhisperSubtitle.psm1](WhisperSubtitle.psm1)) still has unresolved
-      PowerShell syntax errors (missing braces, reserved parameter issues, etc.).
-      These must be fixed for the module to import and function.
+    - The main module file ([WhisperSubtitle.psm1](WhisperSubtitle.psm1)) has been refactored to address syntax errors and improve clarity, including replacing the `UseOldWhisper` switch with a `WhisperImplementation` parameter.
 
-1. **Automated Testing**
+2. **Automated Testing** (Completed)
 
-    - The Tests folder exists, but there’s no mention of automated test coverage or CI in the [README](README.md).
-    - Implement robust Pester tests for all exported functions and document how to run them.
+    - Robust Pester tests have been implemented for all exported functions and helper functions in `Tests/WhisperSubtitle.Core.Tests.ps1` and `Tests/WhisperSubtitle.Config.Tests.ps1`.
+    - Test cases cover various scenarios, including successful execution, error handling, and edge cases.
 
-2. **Installation Automation**
 
-    - The README lists manual, git, and symlink install methods, but no script for dependency setup
-      (e.g., Python, Whisper, FFmpeg, PyTorch).
-    - Provide a PowerShell script to automate environment setup for new users.
+3. **Installation Automation** (Completed)
 
-3. **Error Handling & Logging**
+    - Created `Build/Install-Dependencies.ps1` to automate the installation of external dependencies (Python, Whisper, FFmpeg, PyTorch, Subtitle Edit).
 
-    - The module claims “Advanced error handling,” but ensure all user-facing functions have clear,
-      user-friendly error messages and verbose logging.
 
-4. **Feature Documentation**
+4. **Error Handling & Logging** (Completed)
 
-    - The [README](README.md) is solid, but could use a “Feature Matrix” or table showing which
-      features require which dependencies (e.g., GPU, Subtitle Edit).
+    - All user-facing functions now include clear, user-friendly error messages and consistent verbose logging, ensuring robust error handling throughout the module.
 
-5. **Examples & Usage**
+5. **Feature Documentation** (Completed)
 
-    - There are no examples in [Basic-Usage.ps1](Examples/Basic-Usage.ps1).
-    - Add more real-world usage examples, including batch processing, translation, and error scenarios.
+    - Added a "Feature Matrix" to `README.md` to clearly show which features require which dependencies.
 
-6. **Contribution & Development Guide**
+6. **Examples & Usage** (Completed)
 
-    - Add a [`CONTRIBUTING.md`](CONTRIBUTING.md) to guide new contributors
-      (coding style, PR process, etc.).
+    - Added comprehensive real-world usage examples to `Examples/Basic-Usage.ps1`, covering basic subtitle generation, batch processing, translation, error handling, and using the legacy Whisper implementation.
 
-7. **Changelog Automation**
+7. **Contribution & Development Guide** (Completed)
 
-    - The [`CHANGELOG.md`](CHANGELOG.md) exists, but automate changelog updates via commit messages
-      or PRs.
+    - Created `CONTRIBUTING.md` to provide guidelines for new contributors, covering coding style, testing, documentation, and pull request process.
 
-8. **Module Manifest Updates**
+8. **Changelog Automation** (Completed)
 
-    - Ensure [WhisperSubtitle.psd1](WhisperSubtitle.psd1) is always in sync with the latest version and exported functions.
+    - Updated `CHANGELOG.md` with recent changes and added instructions to `CONTRIBUTING.md` on how to manually update the changelog, with a note on future automation plans.
 
-9. **Optional: VS Code Tasks/Launch Config**
-    - Add [`.vscode/tasks.json`](.vscode/tasks.json) and [`.vscode/launch.json`](.vscode/launch.json)
-      for dev workflow automation.
+9. **Module Manifest Updates** (Completed)
+
+    - Ensured `WhisperSubtitle.psd1` is in sync with the latest version and exported functions from `WhisperSubtitle.psm1`.
+
+10. **Optional: VS Code Tasks/Launch Config** (Completed)
+
+    - Added `.vscode/tasks.json` for common development tasks and `.vscode/launch.json` for debugging configurations.
 
 **Summary:**
 

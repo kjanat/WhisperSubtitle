@@ -227,7 +227,8 @@ function Invoke-WhisperTranscription {
 		[Parameter(Mandatory)]
 		[int]$Processors,
 
-		[switch]$UseOldWhisper,
+		[Parameter(Mandatory)]
+		[string]$WhisperImplementation,
 
 		[switch]$Translate
 	)
@@ -236,10 +237,10 @@ function Invoke-WhisperTranscription {
 
 	$isVerbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue'
 
-	if ($UseOldWhisper) {
-		Invoke-LegacyWhisper @PSBoundParameters -Verbose:$isVerbose
+			if ($WhisperImplementation -eq 'Legacy') {
+		Invoke-LegacyWhisper -AudioPath $AudioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation $WhisperImplementation -Translate:$Translate -Verbose:$isVerbose
 	} else {
-		Invoke-ModernWhisper @PSBoundParameters -Verbose:$isVerbose
+		Invoke-ModernWhisper -AudioPath $AudioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation $WhisperImplementation -Translate:$Translate -Verbose:$isVerbose
 	}
 }
 
@@ -291,6 +292,7 @@ function Invoke-ModernWhisper {
 		[string]$Format,
 		[int]$Threads,
 		[int]$Processors,
+		[string]$WhisperImplementation,
 		[switch]$Translate
 	)
 	$arguments = @(
@@ -415,8 +417,8 @@ function ConvertTo-Subtitle {
     .PARAMETER Format
         The output subtitle format (default: 'srt')
 
-    .PARAMETER UseOldWhisper
-        Use the legacy Whisper implementation
+    .PARAMETER WhisperImplementation
+        Specify which Whisper implementation to use: 'Modern' (default) or 'Legacy'
 
     .PARAMETER Translate
         Translate the subtitles to English
@@ -461,7 +463,8 @@ function ConvertTo-Subtitle {
 		[string]$Format = 'srt',
 
 		[Parameter()]
-		[switch]$UseOldWhisper,
+		[ValidateSet('Modern', 'Legacy')]
+		[string]$WhisperImplementation = 'Modern',
 
 		[Parameter()]
 		[switch]$Translate,
@@ -596,7 +599,7 @@ function ConvertSingleFile {
 		[string]$Format,
 		[int]$Threads,
 		[int]$Processors,
-		[switch]$UseOldWhisper,
+		[string]$WhisperImplementation,
 		[switch]$Translate
 	)
 	$fileHash = (Get-FileHash -LiteralPath $File.FullName -Algorithm MD5).Hash
@@ -608,7 +611,7 @@ function ConvertSingleFile {
 		# Step 1: Extract audio
 		New-AudioFromVideo -VideoFile $File -OutputPath $audioPath
 		# Step 2: Generate subtitles
-		Invoke-WhisperTranscription -AudioPath $audioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -UseOldWhisper:$UseOldWhisper -Translate:$Translate
+		Invoke-WhisperTranscription -AudioPath $audioPath -Language $Language -Model $Model -Format $Format -Threads $Threads -Processors $Processors -WhisperImplementation:$WhisperImplementation -Translate:$Translate
 		# Step 3: Move and optimize subtitle
 		$languageSuffix = $Translate ? 'en' : $Language
 		$finalSubtitlePath = Join-Path $File.Directory "$($File.BaseName).$languageSuffix.$Format"

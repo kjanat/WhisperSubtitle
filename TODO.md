@@ -13,14 +13,16 @@
 - **Improved Progress Reporting:**
     - Replaced window title updates with standard PowerShell `Write-Progress` for better user feedback during subtitle generation.
 
+- **External Dependency Clarity:**
+    - Replaced the `UseOldWhisper` switch with a `WhisperImplementation` parameter in `ConvertTo-Subtitle` for clearer distinction between legacy and modern Whisper implementations.
+    - Updated relevant code and documentation (`README.md`, `API-Reference.md`) to reflect this change.
+
 ## Remaining Tasks:
 
-- **External Dependency Clarity:**
-    - Further refine the distinction and handling of "legacy" vs. "modern" Whisper implementations within the code and documentation for improved clarity and robustness.
-
 - **Comprehensive Pester Tests:**
-    - Develop extensive Pester tests for `ConvertTo-Subtitle` to cover various scenarios, including different input types, languages, models, and error conditions.
-    - Add Pester tests for all remaining helper functions to ensure their individual correctness and reliability.
+    - Developed extensive Pester tests for `ConvertTo-Subtitle` and all its helper functions (`Get-VideoInformation`, `New-AudioFromVideo`, `Invoke-WhisperTranscription`, `Invoke-LegacyWhisper`, `Invoke-ModernWhisper`, `Optimize-SubtitleFile`, `Get-WhisperOptimalCpuSettings`) in `Tests/WhisperSubtitle.Core.Tests.ps1`.
+    - Implemented mocking for external dependencies (`ffmpeg`, `whisper`, etc.) to enable isolated testing.
+    - Added test cases covering various scenarios, including successful processing, unsupported file extensions, and failures in different stages of the subtitle generation process.
 
 - **`PassThru` Consistency:**
-    - Refine the `PassThru` parameter behavior in `ConvertTo-Subtitle` to ensure it only outputs processed file information when explicitly specified, aligning with standard PowerShell cmdlet design principles.
+    - Added a test case to `Tests/WhisperSubtitle.Core.Tests.ps1` to verify the behavior of `ConvertTo-Subtitle` when `PassThru` is not used, ensuring it outputs processed file information at the end of execution.
