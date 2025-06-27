@@ -35,13 +35,11 @@ jobs:
       - name: Generate docs
         uses: Microsoft/ps-docs@main
         with:
-          inputPath: .            # Optional. The path PSDocs will look for files to input files.
-          # modules: string       # Optional. A comma separated list of modules to use containing document definitions.
-          source: .ps-docs/       # Optional. An path containing definitions to use for generating documentation.
-          # conventions: string   # Optional. A comma separated list of conventions to use for generating documentation.
-          outputPath: out         # Optional. The path to write documentation to.
-          path: .                 # Optional. The working directory PSDocs is run from.
-          prerelease: ${{ github.ref == 'refs/heads/master' }} # Optional. Determine if a pre-release module version is installed.
+          inputPath: .            # Path to look for input files
+          source: .ps-docs/       # Path containing document definitions
+          outputPath: out         # Path to write documentation to
+          path: .                 # Working directory for PSDocs
+          prerelease: true        # Allow prerelease modules
 
       - name: Upload docs
         uses: actions/upload-artifact@v4
