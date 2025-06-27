@@ -3,11 +3,14 @@
 document 'Module' {
     Title 'WhisperSubtitle PowerShell Module'
     
-    # Import the module
-    Import-Module ./WhisperSubtitle.psd1 -Force
-    
-    # Get module information
-    $moduleInfo = Get-Module WhisperSubtitle
+    # Test manifest first
+    try {
+        $manifest = Test-ModuleManifest ./WhisperSubtitle.psd1 -ErrorAction Stop
+        $moduleInfo = $manifest
+    } catch {
+        Write-Warning "Failed to load manifest: $($_.Exception.Message)"
+        return
+    }
     
     Section 'Overview' {
         $moduleInfo.Description
@@ -35,10 +38,13 @@ document 'Module' {
     }
     
     Section 'Functions' {
-        $functions = Get-Command -Module WhisperSubtitle -CommandType Function
+        # Import module to get functions
+        Import-Module ./WhisperSubtitle.psd1 -Force -ErrorAction SilentlyContinue
+        $functions = Get-Command -Module WhisperSubtitle -CommandType Function -ErrorAction SilentlyContinue
         
-        foreach ($function in $functions) {
-            $help = Get-Help $function.Name -Full
+        if ($functions) {
+            foreach ($function in $functions) {
+                $help = Get-Help $function.Name -Full -ErrorAction SilentlyContinue
             
             Section $function.Name {
                 $help.Synopsis
@@ -80,6 +86,8 @@ document 'Module' {
                     }
                 }
             }
+        } else {
+            'No functions found or module failed to load.'
         }
     }
     

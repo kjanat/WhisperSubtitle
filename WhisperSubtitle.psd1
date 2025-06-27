@@ -21,7 +21,7 @@
 	Description          = 'Professional subtitle generation module using OpenAI Whisper with advanced features for video processing, multiple output formats, and batch operations.'
 
 	# Minimum PowerShell version
-	PowerShellVersion    = '7'
+	PowerShellVersion    = '7.0'
 
 	# Required modules and assemblies
 	RequiredModules      = @()
