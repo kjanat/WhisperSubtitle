@@ -3,114 +3,110 @@
 document 'Module' {
     Title 'WhisperSubtitle PowerShell Module'
     
-    # Test manifest first
+    # Get module information safely
+    $manifest = $null
     try {
         $manifest = Test-ModuleManifest ./WhisperSubtitle.psd1 -ErrorAction Stop
-        $moduleInfo = $manifest
     } catch {
-        Write-Warning "Failed to load manifest: $($_.Exception.Message)"
+        "Failed to load manifest: $($_.Exception.Message)"
         return
     }
     
     Section 'Overview' {
-        $moduleInfo.Description
+        $manifest.Description
         
-        Paragraph {
-            'Version: ' + $moduleInfo.Version
-            'Author: ' + $moduleInfo.Author
-            'PowerShell: ' + $moduleInfo.PowerShellVersion + '+'
-        }
+        ""
+        "**Version:** $($manifest.Version)"
+        "**Author:** $($manifest.Author)"
+        "**PowerShell:** $($manifest.PowerShellVersion)+"
+        ""
     }
     
     Section 'Installation' {
-        @'
-        ## From PowerShell Gallery
-        ```powershell
-        Install-Module -Name WhisperSubtitle -Scope CurrentUser
-        ```
-        
-        ## From Source
-        ```powershell
-        git clone https://github.com/kjanat/WhisperSubtitle.git
-        Import-Module .\WhisperSubtitle\WhisperSubtitle.psd1
-        ```
-'@
+        "## From PowerShell Gallery"
+        "```powershell"
+        "Install-Module -Name WhisperSubtitle -Scope CurrentUser"
+        "```"
+        ""
+        "## From Source"
+        "```powershell"
+        "git clone https://github.com/kjanat/WhisperSubtitle.git"
+        "Import-Module .\WhisperSubtitle\WhisperSubtitle.psd1"
+        "```"
     }
     
     Section 'Functions' {
-        # Import module to get functions
-        Import-Module ./WhisperSubtitle.psd1 -Force -ErrorAction SilentlyContinue
-        $functions = Get-Command -Module WhisperSubtitle -CommandType Function -ErrorAction SilentlyContinue
-        
-        if ($functions) {
-            foreach ($function in $functions) {
-                $help = Get-Help $function.Name -Full -ErrorAction SilentlyContinue
+        # Try to import module and get functions
+        try {
+            Import-Module ./WhisperSubtitle.psd1 -Force -ErrorAction Stop
+            $functions = Get-Command -Module WhisperSubtitle -CommandType Function -ErrorAction Stop
             
+            foreach ($function in $functions) {
                 Section $function.Name {
-                    $help.Synopsis
-                    
-                    if ($help.Description) {
-                        Section 'Description' {
-                            $help.Description.Text
+                    try {
+                        $help = Get-Help $function.Name -Full -ErrorAction SilentlyContinue
+                        
+                        if ($help.Synopsis) {
+                            $help.Synopsis
+                            ""
                         }
-                    }
-                    
-                    if ($help.Parameters.Parameter) {
-                        Section 'Parameters' {
+                        
+                        if ($help.Description) {
+                            "**Description:**"
+                            $help.Description.Text
+                            ""
+                        }
+                        
+                        if ($help.Parameters.Parameter) {
+                            "**Parameters:**"
                             foreach ($param in $help.Parameters.Parameter) {
-                                Section $param.Name {
-                                    Paragraph {
-                                        "Type: $($param.Type.Name)"
-                                        if ($param.Required -eq 'true') { 'Required: Yes' } else { 'Required: No' }
-                                        if ($param.DefaultValue) { "Default: $($param.DefaultValue)" }
-                                    }
-                                    
-                                    if ($param.Description.Text) {
-                                        $param.Description.Text
-                                    }
+                                "- **$($param.Name)**: $($param.Type.Name)"
+                                if ($param.Description.Text) {
+                                    "  $($param.Description.Text)"
                                 }
                             }
+                            ""
                         }
-                    }
-                    
-                    if ($help.Examples.Example) {
-                        Section 'Examples' {
+                        
+                        if ($help.Examples.Example) {
+                            "**Examples:**"
                             foreach ($example in $help.Examples.Example) {
                                 if ($example.Code) {
-                                    Code powershell $example.Code
+                                    "```powershell"
+                                    $example.Code
+                                    "```"
                                     if ($example.Remarks.Text) {
                                         $example.Remarks.Text
                                     }
+                                    ""
                                 }
                             }
                         }
+                    } catch {
+                        "Error retrieving help for $($function.Name): $($_.Exception.Message)"
                     }
                 }
             }
-        } else {
-            'No functions found or module failed to load.'
+        } catch {
+            "Unable to load module functions: $($_.Exception.Message)"
         }
     }
     
     Section 'Configuration' {
-        @'
-        The module supports configuration through `Get-WhisperSubtitleConfig` and `Set-WhisperSubtitleConfig` cmdlets.
-        
-        Default configuration includes:
-        - Base location for Whisper files
-        - Temporary file path
-        - Subtitle Edit executable path
-        - Supported file extensions
-        - CPU thread settings
-'@
+        "The module supports configuration through Get-WhisperSubtitleConfig and Set-WhisperSubtitleConfig cmdlets."
+        ""
+        "**Default configuration includes:**"
+        "- Base location for Whisper files"
+        "- Temporary file path"  
+        "- Subtitle Edit executable path"
+        "- Supported file extensions"
+        "- CPU thread settings"
     }
     
     Section 'Requirements' {
-        @'
-        - PowerShell 7.0 or higher
-        - FFmpeg (for video processing)
-        - OpenAI Whisper (legacy main.exe or modern whisper CLI)
-        - Subtitle Edit (optional, for subtitle optimization)
-'@
+        "- PowerShell 7.0 or higher"
+        "- FFmpeg (for video processing)"
+        "- OpenAI Whisper (legacy main.exe or modern whisper CLI)"
+        "- Subtitle Edit (optional, for subtitle optimization)"
     }
 }
